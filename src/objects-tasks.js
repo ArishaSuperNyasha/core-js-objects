@@ -372,35 +372,92 @@ function group(array, keySelector, valueSelector) {
  *  For more examples see unit tests.
  */
 
+class CssSelectorClass {
+  constructor(s, { elCount, idCount, pseudoCount, prev }) {
+    this.stroke = s ?? '';
+    this.elCount = elCount ?? 0;
+    this.idCount = idCount ?? 0;
+    this.pseudoCount = pseudoCount ?? 0;
+    this.prev = prev;
+  }
+}
+
 const cssSelectorBuilder = {
-  element(/* value */) {
-    throw new Error('Not implemented');
+  selectorsOrder: 'elidclassattrpsevdoClasspseudo',
+  commonMethod(val) {
+    const match = val.match(/#|(::)|:|\.|\[/);
+    let znak;
+    let type;
+    if (match === null) type = 'el';
+    else if (match[0] === '::') type = 'pseudo';
+    else if (match[0] === '#') type = 'id';
+    else if (match[0] === ':') type = 'psevdoClass';
+    else if (match[0] === '[') type = 'attr';
+    else if (match[0] === '.') type = 'class';
+    if (['el', 'pseudo', 'id'].includes(type)) znak = `${type}Count`;
+
+    if (this.stroke) {
+      this.stroke += val;
+      this[znak] += 1;
+      if (this[znak] > 1)
+        throw new Error(
+          'Element, id and pseudo-element should not occur more then one time inside the selector'
+        );
+
+      if (
+        this.selectorsOrder.indexOf(type) <
+        this.selectorsOrder.indexOf(this.prev)
+      )
+        throw new Error(
+          'Selector parts should be arranged in the following order: element, id, class, attribute, pseudo-class, pseudo-element'
+        );
+      else {
+        this.prev = type;
+      }
+    } else {
+      const options = znak ? { [znak]: 1, prev: type } : { prev: type };
+      return new CssSelectorClass(val, options);
+    }
+    return this;
   },
 
-  id(/* value */) {
-    throw new Error('Not implemented');
+  element(value) {
+    return this.commonMethod(value);
   },
 
-  class(/* value */) {
-    throw new Error('Not implemented');
+  id(value) {
+    return this.commonMethod(`#${value}`);
   },
 
-  attr(/* value */) {
-    throw new Error('Not implemented');
+  class(value) {
+    return this.commonMethod(`.${value}`);
   },
 
-  pseudoClass(/* value */) {
-    throw new Error('Not implemented');
+  attr(value) {
+    return this.commonMethod(`[${value}]`);
   },
 
-  pseudoElement(/* value */) {
-    throw new Error('Not implemented');
+  pseudoClass(value) {
+    return this.commonMethod(`:${value}`);
   },
 
-  combine(/* selector1, combinator, selector2 */) {
-    throw new Error('Not implemented');
+  pseudoElement(value) {
+    return this.commonMethod(`::${value}`);
+  },
+
+  combine(selector1, combinator, selector2) {
+    this.stroke = `${selector1.stringify()} ${combinator} ${selector2.stringify()}`;
+    return this;
+  },
+
+  stringify() {
+    const s = this.stroke;
+    this.stroke = '';
+    return s;
   },
 };
+
+Object.assign(CssSelectorClass.prototype, cssSelectorBuilder);
 
 module.exports = {
   shallowCopy,
